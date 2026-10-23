@@ -32,15 +32,132 @@
 void parse(std::vector<Token> &tokens)
 {
     Command currentCommand;
+
+    if (tokens.empty() ){
+        return;
+    }
     SimpleCommand *currentSimpleCommand = new SimpleCommand();
 
-    currentCommand.execute();
-    /*
-      Implement this function 
-      you must parse for all possible tokens scenario
-      right now command.execute only print the format , you will inject it in your logic.
+    int i=0;
+    bool newCommand =false;
+    bool eoa=false;
+    bool failed=false;
+    bool pipe=false;
+    SimpleCommand **_pipeCommands;
+    while ( i<tokens.size())
+    {   if (i+1 == tokens.size())
+        {
+            eoa=true;
+        }
+        if (tokens[i].type == TOKEN_COMMAND && !newCommand)
+        {
+            newCommand=true;
+            currentSimpleCommand->insertArgument(tokens[i].value.c_str());
 
-    */
+            i++;
+            continue;
+        }
+        if (tokens[i].type == TOKEN_PIPE)
+        {
+            if (eoa || tokens[i++].type==TOKEN_PIPE || i==0)
+            {
+                failed=true;
+                break;
+            }
+            else
+            {
+                pipe=true;
+                currentCommand.insertSimpleCommand(currentSimpleCommand);
+                currentSimpleCommand = new SimpleCommand();
+                currentSimpleCommand->insertArgument(tokens[i++].value.c_str());
+
+                i++;
+                continue;
+            }
+        }
+        if(tokens[i].type==TOKEN_ARGUMENT && newCommand==true)
+        {
+            currentSimpleCommand->insertArgument(tokens[i].value.c_str());
+        }
+        if (tokens[i].type==TOKEN_BACKGROUND)
+        {   if(!eoa)
+            {
+                failed=true;
+                break;
+            }
+            currentCommand._background=1;
+        }
+
+        if (tokens[i].type==TOKEN_REDIRECT)
+        {   if(eoa)
+            {
+                failed=true;
+                break;
+            }
+            if (tokens[i+1].type==TOKEN_ARGUMENT)
+            {
+                currentCommand._outFile = strdup(tokens[i+1].value.c_str());
+            }
+        }
+        if (tokens[i].type==TOKEN_APPEND)
+        {  if (eoa)
+            {
+                failed=true;
+                break;
+            }
+            else if (tokens[i+1].type==TOKEN_ARGUMENT)
+            {
+                currentCommand._outFile = strdup(tokens[i+1].value.c_str());
+                currentCommand._append=1;
+            }
+        }
+        if (tokens[i].type==TOKEN_INPUT)
+        {   if (eoa)
+            {
+                failed=true;
+                break;
+            }
+            else if (tokens[i+1].type==TOKEN_ARGUMENT)
+            {
+                currentCommand._inputFile = strdup(tokens[i+1].value.c_str());
+            }
+        }
+        if (tokens[i].type==TOKEN_ERROR)
+        {   if(eoa)
+            {
+                failed=true;
+                break;
+            }
+            else if (tokens[i+1].type==TOKEN_ARGUMENT)
+            {
+                currentCommand._out_error=1;
+            }
+        }
+        if (tokens[i].type==TOKEN_REDIRECT_AND_ERROR)
+        {   if(eoa)
+            {
+                failed=true;
+                break;
+            }
+            else if (tokens[i++].type==TOKEN_ARGUMENT)
+            {
+                currentCommand._errFile = strdup(tokens[i+1].value.c_str());
+            }
+        }
+        if (tokens[i].type==TOKEN_EOF)
+        {
+            break;
+        }
+    i++;
+    };
+    currentCommand.insertSimpleCommand(currentSimpleCommand);
+//-----------------------------------------------------------------------------
+if (failed)
+{
+    currentCommand.clear();
+}
+//-----------------------------------------------------------------------------
+    currentCommand.execute();
 }
 
 SimpleCommand::SimpleCommand()
@@ -155,10 +272,16 @@ void Command::print()
 void Command::execute()
 {
     print();
-    /*
-        Write your code here
-    */
+//
+    if (currentCommand._numberOfSimpleCommands == 1)
+    {
 
+    }
+    else
+    {
+        
+    }
+//
     clear();
     prompt();
 }
