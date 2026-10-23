@@ -53,7 +53,7 @@ void parse(std::vector<Token> &tokens)
         if (tokens[i].type == TOKEN_COMMAND && !newCommand)
         {
             newCommand = true;
-            currentSimpleCommand->insertArgument(tokens[i].value.c_str());
+            currentSimpleCommand->insertArgument(const_cast<char*>(tokens[i].value.c_str()));
             i++;
             continue;
         }
@@ -69,7 +69,7 @@ void parse(std::vector<Token> &tokens)
                 pipe = true;
                 currentCommand.insertSimpleCommand(currentSimpleCommand);
                 currentSimpleCommand = new SimpleCommand();
-                currentSimpleCommand->insertArgument(tokens[i++].value.c_str());
+                currentSimpleCommand->insertArgument(const_cast<char*>(tokens[i++].value.c_str()));
                 newCommand=false;
                 //currentCommand._outFile=0;
                 //currentCommand._errFile=0;
@@ -80,7 +80,7 @@ void parse(std::vector<Token> &tokens)
         }
         if (tokens[i].type == TOKEN_ARGUMENT && newCommand == true)
         {
-            currentSimpleCommand->insertArgument(tokens[i].value.c_str());
+            currentSimpleCommand->insertArgument(const_cast<char*>(tokens[i].value.c_str()));
         }
         if (tokens[i].type == TOKEN_BACKGROUND)
         {
