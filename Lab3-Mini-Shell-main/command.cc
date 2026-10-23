@@ -397,20 +397,27 @@ void Command::execute()
         }
         if (pid>0)
         {//parent process
-            close(pipfd[1]);
-            prevr = pipfd[0];
-            if(prevr!=-1){
+            
+            if(!last){
+                close(pipfd[1]);
+                prevr = pipfd[0];
+            }
+            else 
+            {
                 close(prevr);
             }
             children_pids[i]=pid;
-            if (!_background)
-            {   
-                for (int j=0 ; j<_numberOfSimpleCommands ; j++)
-                   { waitpid(children_pids[j],nullptr,0);}
-            } 
-        }        
+        }
+                
     }
-
+    if (!_background)
+    {   
+        for (int j=0 ; j<_numberOfSimpleCommands ; j++)
+        { // here we cannot use while(waitpid(-1,nullptr,0)!=-1){}; since we have no control on the pids passed to waitpid
+            //it can cause waiting of this parent on processes other than its children.
+            waitpid(children_pids[j],nullptr,0);
+        }
+    } 
     clear();
     prompt();
 }
