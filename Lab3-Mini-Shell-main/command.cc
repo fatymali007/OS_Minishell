@@ -1,6 +1,6 @@
 
 /*
- * 
+ *
  *
  * Template file.
  * You will need to add more code here to execute the command table.
@@ -28,135 +28,144 @@
 #include "command.h"
 #include "tokenizer.h"
 
-
 void parse(std::vector<Token> &tokens)
 {
     Command currentCommand;
 
-    if (tokens.empty() ){
+    if (tokens.empty())
+    {
         return;
     }
     SimpleCommand *currentSimpleCommand = new SimpleCommand();
 
-    int i=0;
-    bool newCommand =false;
-    bool eoa=false;
-    bool failed=false;
-    bool pipe=false;
+    int i = 0;
+    bool newCommand = false;
+    bool eoa = false;
+    bool failed = false;
+    bool pipe = false;
     SimpleCommand **_pipeCommands;
-    while ( i<tokens.size())
-    {   if (i+1 == tokens.size())
+    while (i < tokens.size())
+    {
+        if (i + 1 == tokens.size())
         {
-            eoa=true;
+            eoa = true;
         }
         if (tokens[i].type == TOKEN_COMMAND && !newCommand)
         {
-            newCommand=true;
+            newCommand = true;
             currentSimpleCommand->insertArgument(tokens[i].value.c_str());
-
             i++;
             continue;
         }
         if (tokens[i].type == TOKEN_PIPE)
         {
-            if (eoa || tokens[i++].type==TOKEN_PIPE || i==0)
+            if (eoa || tokens[i++].type == TOKEN_PIPE || i == 0)
             {
-                failed=true;
+                failed = true;
                 break;
             }
             else
             {
-                pipe=true;
+                pipe = true;
                 currentCommand.insertSimpleCommand(currentSimpleCommand);
                 currentSimpleCommand = new SimpleCommand();
                 currentSimpleCommand->insertArgument(tokens[i++].value.c_str());
+                newCommand=false;
+                //currentCommand._outFile=0;
+                //currentCommand._errFile=0;
 
                 i++;
                 continue;
             }
         }
-        if(tokens[i].type==TOKEN_ARGUMENT && newCommand==true)
+        if (tokens[i].type == TOKEN_ARGUMENT && newCommand == true)
         {
             currentSimpleCommand->insertArgument(tokens[i].value.c_str());
         }
-        if (tokens[i].type==TOKEN_BACKGROUND)
-        {   if(!eoa)
+        if (tokens[i].type == TOKEN_BACKGROUND)
+        {
+            if (!eoa)
             {
-                failed=true;
+                failed = true;
                 break;
             }
-            currentCommand._background=1;
+            currentCommand._background = 1;
         }
 
-        if (tokens[i].type==TOKEN_REDIRECT)
-        {   if(eoa)
+        if (tokens[i].type == TOKEN_REDIRECT)
+        {
+            if (eoa)
             {
-                failed=true;
+                failed = true;
                 break;
             }
-            if (tokens[i+1].type==TOKEN_ARGUMENT)
+            if (tokens[i + 1].type == TOKEN_ARGUMENT)
             {
-                currentCommand._outFile = strdup(tokens[i+1].value.c_str());
+                currentCommand._outFile = strdup(tokens[i + 1].value.c_str());
             }
         }
-        if (tokens[i].type==TOKEN_APPEND)
-        {  if (eoa)
+        if (tokens[i].type == TOKEN_APPEND)
+        {
+            if (eoa)
             {
-                failed=true;
+                failed = true;
                 break;
             }
-            else if (tokens[i+1].type==TOKEN_ARGUMENT)
+            else if (tokens[i + 1].type == TOKEN_ARGUMENT)
             {
-                currentCommand._outFile = strdup(tokens[i+1].value.c_str());
-                currentCommand._append=1;
+                currentCommand._outFile = strdup(tokens[i + 1].value.c_str());
+                currentCommand._append = 1;
             }
         }
-        if (tokens[i].type==TOKEN_INPUT)
-        {   if (eoa)
+        if (tokens[i].type == TOKEN_INPUT && newCommand)
+        {
+            if (eoa)
             {
-                failed=true;
+                failed = true;
                 break;
             }
-            else if (tokens[i+1].type==TOKEN_ARGUMENT)
+            else if (tokens[i + 1].type == TOKEN_ARGUMENT)
             {
-                currentCommand._inputFile = strdup(tokens[i+1].value.c_str());
+                currentCommand._inputFile = strdup(tokens[i + 1].value.c_str());
             }
         }
-        if (tokens[i].type==TOKEN_ERROR)
-        {   if(eoa)
+        if (tokens[i].type == TOKEN_ERROR)
+        {
+            if (eoa)
             {
-                failed=true;
+                failed = true;
                 break;
             }
-            else if (tokens[i+1].type==TOKEN_ARGUMENT)
+            else if (tokens[i + 1].type == TOKEN_ARGUMENT)
             {
-                currentCommand._out_error=1;
+                currentCommand._out_error = 1;
             }
         }
-        if (tokens[i].type==TOKEN_REDIRECT_AND_ERROR)
-        {   if(eoa)
+        if (tokens[i].type == TOKEN_REDIRECT_AND_ERROR)
+        {
+            if (eoa)
             {
-                failed=true;
+                failed = true;
                 break;
             }
-            else if (tokens[i++].type==TOKEN_ARGUMENT)
+            else if (tokens[i++].type == TOKEN_ARGUMENT)
             {
-                currentCommand._errFile = strdup(tokens[i+1].value.c_str());
+                currentCommand._errFile = strdup(tokens[i + 1].value.c_str());
             }
         }
-        if (tokens[i].type==TOKEN_EOF)
+        if (tokens[i].type == TOKEN_EOF)
         {
             break;
         }
-    i++;
+        i++;
     };
     currentCommand.insertSimpleCommand(currentSimpleCommand);
-//-----------------------------------------------------------------------------
-if (failed)
-{
-    currentCommand.clear();
-}
-//-----------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
+    if (failed)
+    {
+        currentCommand.clear();
+    }
+    //-----------------------------------------------------------------------------
     currentCommand.execute();
 }
 
@@ -264,46 +273,166 @@ void Command::print()
     printf("  Output       Input        Error        Err&Out       Background\n");
     printf("  ------------ ------------ ------------ ------------ ------------\n");
     printf("  %-12s %-12s %-12s %-12s %-12s\n", _outFile ? _outFile : "default",
-           _inputFile ? _inputFile : "default", _errFile ? _errFile : "default", _out_error == 1 ? _errFile : "default"
-           ,_background ? "YES" : "NO");
+           _inputFile ? _inputFile : "default", _errFile ? _errFile : "default", _out_error == 1 ? _errFile : "default", _background ? "YES" : "NO");
     printf("\n\n");
 }
 
 void Command::execute()
 {
     print();
-//
-    if (currentCommand._numberOfSimpleCommands == 1)
+    //
+    int i = 0;
+    bool simple = (_numberOfSimpleCommands == 1);
+    bool last;
+    int prevr;
+    int exc;
+    int children_pids[_numberOfSimpleCommands];
+    while (i < _numberOfSimpleCommands)
     {
+        last = (i + 1 == _numberOfSimpleCommands);
+        int pipfd[2];
+        if (!last)
+        {
+            if (pipe(pipfd) == -1)
+            {
+                // error
+            }
+        }
+        pid_t pid = fork();
+        if (pid == -1)
+        {
+            // error
+        }
+        else if (pid == 0)
+        {
+            // child process
+            if (i == 0) // first command
+            {
+                int ipfile = open(_inputFile, O_RDONLY);
+                if (ipfile == -1)
+                { // error
+                }
+                if (dup2(ipfile, STDIN_FILENO) == -1)
+                {
+                    // error
+                }
+                close(ipfile);
+                if (!last)
+                {
+                    dup2(pipfd[1], STDOUT_FILENO);
+                }
+                else
+                {
+                    int opfile = open(_outFile, O_WRONLY | O_CREAT ,0666);
+                    if (dup2(opfile, STDOUT_FILENO) == -1)
+                    {
+                        // error
+                    }
+                    close(opfile);
+                }
+            }
+            else {
 
-    }
-    else
-    {
+                dup2(prevr, STDIN_FILENO);
+
+                if (!last)
+                {
+                    dup2(pipfd[1], STDOUT_FILENO);
+                    if(prevr==-1)
+                    {
+                        close(prevr);
+                    }
+                    close(pipfd[0]);
+                    close(pipfd[1]);
+                }
+                else
+                {
+                    if (_outFile != 0)
+                    {   int opfile;
+                        if (_append)
+                        {
+                            opfile = open(_outFile, O_APPEND);
+                        }
+                        else
+                        {
+                            opfile = open(_outFile, O_WRONLY | O_CREAT ,0666);
+                        }
+                        if (opfile == -1)
+                        { // error
+                        }
+                        if (dup2(opfile, STDOUT_FILENO) == -1)
+                        {
+                            // error
+                        }
+                        close(opfile);
+                    }
+                    if (_errFile != 0)
+                        {   int erfile;
+                            if (_append)
+                            {
+                                erfile = open(_errFile, O_APPEND);
+                            }
+                            else
+                            {   
+                                erfile = open(_errFile, O_WRONLY | O_CREAT ,0666);
+                            }
+                            if (erfile == -1)
+                            {
+                                // error
+                            }
+                            if (dup2(erfile, STDOUT_FILENO) == -1)
+                            {
+                                // error
+                            }
+                            close(erfile);
+                        }
+                        if (_out_error)
+                        {
+                            dup2 (STDERR_FILENO, STDOUT_FILENO);
+                        }
+                    }}
+                    
+                    exc = execvp(_simpleCommands[i]->_arguments[0], _simpleCommands[i]->_arguments);
         
+        }
+        if (pid>0)
+        {//parent process
+            close(pipfd[1]);
+            prevr = pipfd[0];
+            if(prevr!=-1){
+                close(prevr);
+            }
+            children_pids[i]=pid;
+            if (!_background)
+            {   
+                for (int j=0 ; j<_numberOfSimpleCommands ; j++)
+                   { waitpid(children_pids[j],nullptr,0);}
+            } 
+        }        
     }
-//
+
     clear();
     prompt();
 }
 
-void Command::prompt()
-{
-    printf("myshell>");
-    fflush(stdout);
-    std::string input;
-    while (true)
+    void Command::prompt()
     {
-        std::getline(std::cin, input); 
-        std::vector<Token> tokens = tokenize(input);
-        parse(tokens);
+        printf("myshell>");
+        fflush(stdout);
+        std::string input;
+        while (true)
+        {
+            std::getline(std::cin, input);
+            std::vector<Token> tokens = tokenize(input);
+            parse(tokens);
+        }
     }
-}
 
-Command Command::_currentCommand;
-SimpleCommand *Command::_currentSimpleCommand;
+    Command Command::_currentCommand;
+    SimpleCommand *Command::_currentSimpleCommand;
 
-int main()
-{
-    Command::_currentCommand.prompt();
-    return 0;
-}
+    int main()
+    {
+        Command::_currentCommand.prompt();
+        return 0;
+    }
