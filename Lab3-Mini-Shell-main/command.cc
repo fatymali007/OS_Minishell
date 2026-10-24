@@ -59,9 +59,22 @@ void parse(std::vector<Token> &tokens)
         }
         if (tokens[i].type == TOKEN_PIPE)
         {
-            if (eoa || tokens[i++].type == TOKEN_PIPE || i == 0)
-            {
+            if (eoa)
+            {   
+                printf("'%s' : MISSING FOLLOWING COMMAND!\n",tokens[i].value);
                 failed = true;
+                break;
+            }
+            else if (tokens[i+1].type==TOKEN_PIPE)
+            {
+                printf("'%s' :TOKEN UNSUPPORTED!\n",tokens[i].value);
+                failed=true;
+                break;
+            }
+            else if (i==0)
+            {
+                printf("'%s' : MISSING PRECEEDING COMMAND!\n",tokens[i].value);
+                failed=true;
                 break;
             }
             else
@@ -73,7 +86,6 @@ void parse(std::vector<Token> &tokens)
                 newCommand=false;
                 //currentCommand._outFile=0;
                 //currentCommand._errFile=0;
-
                 i++;
                 continue;
             }
@@ -86,6 +98,7 @@ void parse(std::vector<Token> &tokens)
         {
             if (!eoa)
             {
+                printf("'%s' MUST BE AT THE END!\n",tokens[i].value);
                 failed = true;
                 break;
             }
@@ -95,7 +108,7 @@ void parse(std::vector<Token> &tokens)
         if (tokens[i].type == TOKEN_REDIRECT)
         {
             if (eoa)
-            {
+            {   printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
                 failed = true;
                 break;
             }
@@ -107,7 +120,8 @@ void parse(std::vector<Token> &tokens)
         if (tokens[i].type == TOKEN_APPEND)
         {
             if (eoa)
-            {
+            {   
+                printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
                 failed = true;
                 break;
             }
@@ -121,6 +135,7 @@ void parse(std::vector<Token> &tokens)
         {
             if (eoa)
             {
+                printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
                 failed = true;
                 break;
             }
@@ -130,21 +145,17 @@ void parse(std::vector<Token> &tokens)
             }
         }
         if (tokens[i].type == TOKEN_ERROR)
-        {
-            if (eoa)
+        {   if (!eoa)
             {
-                failed = true;
-                break;
+                printf("'%s' : MUST BE AT THE END!\n",tokens[i].value);
             }
-            else if (tokens[i + 1].type == TOKEN_ARGUMENT)
-            {
-                currentCommand._out_error = 1;
-            }
+            currentCommand._out_error = 1;
         }
         if (tokens[i].type == TOKEN_REDIRECT_AND_ERROR)
         {
             if (eoa)
             {
+                printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
                 failed = true;
                 break;
             }
@@ -162,7 +173,7 @@ void parse(std::vector<Token> &tokens)
     currentCommand.insertSimpleCommand(currentSimpleCommand);
     //-----------------------------------------------------------------------------
     if (failed)
-    {
+    {   fprintf(stderr,"ERROR: '%s' PARSING ERROR\n",tokens[i].value);
         currentCommand.clear();
     }
     //-----------------------------------------------------------------------------
@@ -284,6 +295,7 @@ void Command::execute()
     int i = 0;
     bool simple = (_numberOfSimpleCommands == 1);
     bool last;
+    bool execerr;
     int prevr;
     int exc;
     int children_pids[_numberOfSimpleCommands];
@@ -295,13 +307,17 @@ void Command::execute()
         {
             if (pipe(pipfd) == -1)
             {
-                // error
+                fprintf(stderr, "ERROR: PIPE CREATION FAILED\n");
+                execerr=true;
+                break;
             }
         }
         pid_t pid = fork();
         if (pid == -1)
         {
-            // error
+            fprintf(stderr,"ERROR: FORK CREATION FAILED");
+            execerr=true;
+            break;
         }
         else if (pid == 0)
         {
@@ -310,11 +326,16 @@ void Command::execute()
             {
                 int ipfile = open(_inputFile, O_RDONLY);
                 if (ipfile == -1)
-                { // error
+                { 
+                    fprintf(stderr,"ERROR: INPUT FILE NOT FOUND!");
+                    execerr=true;
+                    break;
                 }
                 if (dup2(ipfile, STDIN_FILENO) == -1)
                 {
-                    // error
+                    fprintf(stderr,"ERROR: INVALID FILE DESCRIPTOR!");
+                    execerr=true;
+                    break;
                 }
                 close(ipfile);
                 if (!last)
@@ -324,9 +345,17 @@ void Command::execute()
                 else
                 {
                     int opfile = open(_outFile, O_WRONLY | O_CREAT ,0666);
+                    if (opfile == -1)
+                    { 
+                        fprintf(stderr,"ERROR: OUTPUT FILE NOT FOUND!");
+                        execerr=true;
+                        break;
+                    }
                     if (dup2(opfile, STDOUT_FILENO) == -1)
                     {
-                        // error
+                        fprintf(stderr,"ERROR: INVALID FILE DESCRIPTOR!");
+                        execerr=true;
+                        break;
                     }
                     close(opfile);
                 }
@@ -351,18 +380,23 @@ void Command::execute()
                     {   int opfile;
                         if (_append)
                         {
-                            opfile = open(_outFile, O_APPEND);
+                            if(opfile = open(_outFile, O_APPEND)==-1);
                         }
                         else
                         {
                             opfile = open(_outFile, O_WRONLY | O_CREAT ,0666);
                         }
                         if (opfile == -1)
-                        { // error
+                        { 
+                            fprintf(stderr,"ERROR: OUTPUT FILE NOT FOUND!");
+                            execerr=true;
+                            break;
                         }
                         if (dup2(opfile, STDOUT_FILENO) == -1)
                         {
-                            // error
+                            fprintf(stderr, "ERROR: INVALID FILE DESCRIPTOR!");
+                            execerr = true;
+                            break;
                         }
                         close(opfile);
                     }
@@ -378,11 +412,15 @@ void Command::execute()
                             }
                             if (erfile == -1)
                             {
-                                // error
+                                fprintf(stderr, "ERROR: ERROR FILE NOT FOUND!");
+                                execerr = true;
+                                break;
                             }
                             if (dup2(erfile, STDOUT_FILENO) == -1)
                             {
-                                // error
+                                fprintf(stderr,"ERROR: INVALID FILE DESCRIPTOR!");
+                                execerr=true;
+                                break;
                             }
                             close(erfile);
                         }
@@ -390,10 +428,16 @@ void Command::execute()
                         {
                             dup2 (STDERR_FILENO, STDOUT_FILENO);
                         }
-                    }}
+                    }
+                }
                     
                     exc = execvp(_simpleCommands[i]->_arguments[0], _simpleCommands[i]->_arguments);
-        
+                    if (exc==-1)
+                    {
+                       fprintf(stderr,"ERROR 'execvp' : COMMAND NOT FOUND!");
+                       execerr=true;
+                       break;
+                    }
         }
         if (pid>0)
         {//parent process
@@ -410,7 +454,7 @@ void Command::execute()
         }
                 
     }
-    if (!_background)
+    if (!_background && !execerr)
     {   
         for (int j=0 ; j<_numberOfSimpleCommands ; j++)
         { // here we cannot use while(waitpid(-1,nullptr,0)!=-1){}; since we have no control on the pids passed to waitpid
