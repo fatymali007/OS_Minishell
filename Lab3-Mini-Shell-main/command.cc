@@ -44,6 +44,7 @@ void parse(std::vector<Token> &tokens)
     bool failed = false;
     bool pipe = false;
     SimpleCommand **_pipeCommands;
+
     while (i < tokens.size())
     {
         if (i + 1 == tokens.size())
@@ -61,19 +62,19 @@ void parse(std::vector<Token> &tokens)
         {
             if (eoa)
             {   
-                printf("'%s' : MISSING FOLLOWING COMMAND!\n",tokens[i].value);
+                printf("'%s' : MISSING FOLLOWING COMMAND!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed = true;
                 break;
             }
             else if (tokens[i+1].type==TOKEN_PIPE)
             {
-                printf("'%s' :TOKEN UNSUPPORTED!\n",tokens[i].value);
+                printf("'%s' :TOKEN UNSUPPORTED!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed=true;
                 break;
             }
             else if (i==0)
             {
-                printf("'%s' : MISSING PRECEEDING COMMAND!\n",tokens[i].value);
+                printf("'%s' : MISSING PRECEEDING COMMAND!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed=true;
                 break;
             }
@@ -98,7 +99,7 @@ void parse(std::vector<Token> &tokens)
         {
             if (!eoa)
             {
-                printf("'%s' MUST BE AT THE END!\n",tokens[i].value);
+                printf("'%s' MUST BE AT THE END!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed = true;
                 break;
             }
@@ -108,7 +109,7 @@ void parse(std::vector<Token> &tokens)
         if (tokens[i].type == TOKEN_REDIRECT)
         {
             if (eoa)
-            {   printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
+            {   printf("'%s' : MISSING ARGUMENT!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed = true;
                 break;
             }
@@ -121,7 +122,7 @@ void parse(std::vector<Token> &tokens)
         {
             if (eoa)
             {   
-                printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
+                printf("'%s' : MISSING ARGUMENT!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed = true;
                 break;
             }
@@ -135,7 +136,7 @@ void parse(std::vector<Token> &tokens)
         {
             if (eoa)
             {
-                printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
+                printf("'%s' : MISSING ARGUMENT!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed = true;
                 break;
             }
@@ -147,7 +148,7 @@ void parse(std::vector<Token> &tokens)
         if (tokens[i].type == TOKEN_ERROR)
         {   if (!eoa)
             {
-                printf("'%s' : MUST BE AT THE END!\n",tokens[i].value);
+                printf("'%s' : MUST BE AT THE END!\n",const_cast<char*>(tokens[i].value.c_str()));
             }
             currentCommand._out_error = 1;
         }
@@ -155,7 +156,7 @@ void parse(std::vector<Token> &tokens)
         {
             if (eoa)
             {
-                printf("'%s' : MISSING ARGUMENT!\n",tokens[i].value);
+                printf("'%s' : MISSING ARGUMENT!\n",const_cast<char*>(tokens[i].value.c_str()));
                 failed = true;
                 break;
             }
@@ -173,7 +174,7 @@ void parse(std::vector<Token> &tokens)
     currentCommand.insertSimpleCommand(currentSimpleCommand);
     //-----------------------------------------------------------------------------
     if (failed)
-    {   fprintf(stderr,"ERROR: '%s' PARSING ERROR\n",tokens[i].value);
+    {   fprintf(stderr,"ERROR: '%s' PARSING ERROR\n",const_cast<char*>(tokens[i].value.c_str()));
         currentCommand.clear();
     }
     //-----------------------------------------------------------------------------
@@ -299,6 +300,35 @@ void Command::execute()
     int prevr;
     int exc;
     int children_pids[_numberOfSimpleCommands];
+    FILE * logfile =fopen("logfile.txt","a");
+    if(logfile==nullptr)
+    {
+        fprintf(stderr,"ERROR: LOGFILE NOT FOUND!");
+        exit(0);
+    }
+
+    if (strcmp(_simpleCommands[0]->_arguments[0],"exit")==0)
+    {
+        printf("GOODBYE! :) \n");
+        exit(0);
+    }
+    if (strcmp(_simpleCommands[0]->_arguments[0],"cd")==0)
+    {
+        char* dir;
+        if(_simpleCommands[0]->_arguments[2] == nullptr)
+        {
+            dir=getenv("HOME");
+        }
+        else
+        {
+            dir=_simpleCommands[0]->_arguments[2];
+        }
+        if (chdir(dir) == -1)
+        {
+            printf("CANNOT CHANGE DIRECTORY TO '%s' \n", dir);
+            fprintf(stderr, "ERROR:CANNOT CHANGE DIRECTORY TO '%s' \n", dir);
+        }
+    }
     while (i < _numberOfSimpleCommands)
     {
         last = (i + 1 == _numberOfSimpleCommands);
@@ -324,25 +354,32 @@ void Command::execute()
             // child process
             if (i == 0) // first command
             {
-                int ipfile = open(_inputFile, O_RDONLY);
-                if (ipfile == -1)
-                { 
-                    fprintf(stderr,"ERROR: INPUT FILE NOT FOUND!");
-                    execerr=true;
-                    break;
-                }
-                if (dup2(ipfile, STDIN_FILENO) == -1)
+                if (_inputFile != nullptr)
                 {
-                    fprintf(stderr,"ERROR: INVALID FILE DESCRIPTOR!");
-                    execerr=true;
-                    break;
+                    int ipfile = open(_inputFile, O_RDONLY);
+                    if (ipfile == -1)
+                    {
+                        fprintf(stderr, "ERROR: INPUT FILE NOT FOUND!");
+                        execerr = true;
+                        break;
+                    }
+                    if (dup2(ipfile, STDIN_FILENO) == -1)
+                    {
+                        fprintf(stderr, "ERROR: INVALID FILE DESCRIPTOR!");
+                        execerr = true;
+                        break;
+                    }
+                    close(ipfile);
                 }
-                close(ipfile);
+                else
+                {
+
+                }
                 if (!last)
                 {
                     dup2(pipfd[1], STDOUT_FILENO);
                 }
-                else
+                else if (_outFile != nullptr)
                 {
                     int opfile = open(_outFile, O_WRONLY | O_CREAT ,0666);
                     if (opfile == -1)
@@ -376,11 +413,11 @@ void Command::execute()
                 }
                 else
                 {
-                    if (_outFile != 0)
+                    if (_outFile != nullptr)
                     {   int opfile;
                         if (_append)
                         {
-                            if(opfile = open(_outFile, O_APPEND)==-1);
+                            opfile = open(_outFile, O_APPEND);
                         }
                         else
                         {
@@ -400,7 +437,7 @@ void Command::execute()
                         }
                         close(opfile);
                     }
-                    if (_errFile != 0)
+                    if (_errFile != nullptr)
                         {   int erfile;
                             if (_append)
                             {
@@ -454,14 +491,31 @@ void Command::execute()
         }
                 
     }
+    int pid_ter;
     if (!_background && !execerr)
     {   
         for (int j=0 ; j<_numberOfSimpleCommands ; j++)
         { // here we cannot use while(waitpid(-1,nullptr,0)!=-1){}; since we have no control on the pids passed to waitpid
             //it can cause waiting of this parent on processes other than its children.
-            waitpid(children_pids[j],nullptr,0);
+            pid_ter=waitpid(children_pids[j],nullptr,0);
+            fprintf(logfile, "Child process %d terminated\n", pid_ter);
+            fflush(logfile);
         }
     } 
+    else if(!execerr)
+    {
+        while((pid_ter=waitpid(-1,nullptr,WNOHANG))>0)
+        {
+            fprintf(logfile, "Child process %d terminated\n", pid_ter);
+            fflush(logfile);
+        }
+    }
+    else
+    {
+        fprintf(stderr,"ERROR: EXECUTION ERROR\n");
+        clear();
+    }
+    fclose(logfile);
     clear();
     prompt();
 }
@@ -483,7 +537,14 @@ void Command::execute()
     SimpleCommand *Command::_currentSimpleCommand;
 
     int main()
-    {
+    {   signal(SIGINT, SIG_IGN);
+        
+        int logg=open("logfile.txt",O_CREAT |O_WRONLY |O_APPEND , 0666);
+        if(logg==-1)
+        {
+            fprintf(stderr,"ERROR: UNABLE TO CREATE LOGFILE");
+        }
+
         Command::_currentCommand.prompt();
         return 0;
     }
