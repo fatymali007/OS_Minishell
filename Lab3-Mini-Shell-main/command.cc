@@ -85,8 +85,6 @@ void parse(std::vector<Token> &tokens)
                 currentSimpleCommand = new SimpleCommand();
                 currentSimpleCommand->insertArgument(const_cast<char*>(tokens[i++].value.c_str()));
                 newCommand=false;
-                //currentCommand._outFile=0;
-                //currentCommand._errFile=0;
                 i++;
                 continue;
             }
@@ -132,7 +130,7 @@ void parse(std::vector<Token> &tokens)
                 currentCommand._append = 1;
             }
         }
-        if (tokens[i].type == TOKEN_INPUT && newCommand)
+        if (tokens[i].type == TOKEN_INPUT)
         {
             if (eoa)
             {
@@ -297,7 +295,7 @@ void Command::execute()
     bool simple = (_numberOfSimpleCommands == 1);
     bool last;
     bool execerr;
-    int prevr;
+    int prevr=-1;
     int exc;
     int children_pids[_numberOfSimpleCommands];
     FILE * logfile =fopen("logfile.txt","a");
@@ -371,11 +369,7 @@ void Command::execute()
                     }
                     close(ipfile);
                 }
-                else
-                {
-
-                }
-                if (!last)
+                else if (!last)
                 {
                     dup2(pipfd[1], STDOUT_FILENO);
                 }
@@ -397,17 +391,14 @@ void Command::execute()
                     close(opfile);
                 }
             }
-            else {
-
+            else 
+            {
                 dup2(prevr, STDIN_FILENO);
 
                 if (!last)
                 {
                     dup2(pipfd[1], STDOUT_FILENO);
-                    if(prevr==-1)
-                    {
-                        close(prevr);
-                    }
+                    
                     close(pipfd[0]);
                     close(pipfd[1]);
                 }
